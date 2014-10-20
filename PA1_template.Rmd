@@ -1,25 +1,294 @@
----
-title: "Reproducible Research: Peer Assessment 1"
-output: 
-  html_document:
-    keep_md: true
----
+###### Reproducible Research | Peer Assessment 1 
+###### Authro: Larry Lugo, Ing. M.Sc.
+###### Environment: R x64 v3.1.1. SO: Windows 8.1, 8 MG RAM
+###### On an AMD E-300 APU Radeon HD Graphics 1.3 GHz (HP 2000 laptop)
+###### Date: October, 2014.
+
+## Summary
+
+This document was created to fulfill Reproducible Research's Peer Assessment 1 requirements on writing a report using **a single R markdown document** that can be processed by **knitr** and be transformed into an HTML file.  
+
+## Setting Working Environment
+
+### Setting global options. Set echo equal to **TRUE** and results equal to **'hold'** for the whole document.  
+```{r setoptions}
+library(knitr)
+opts_chunk$set(echo = TRUE, results = 'hold')
+```
+
+### Load required libraries. ggplot was selected for plotting
+```{r library_calls}
+library(data.table)
+library(xtable)
+library(ggplot2) 
+```
+
+## Getting and Cleaning Data
+
+### Loading and preprocessing the data
+According to information provided in this assessment, data is from a personal activity monitoring device that collects data at 5 minute intervals through out the day. The data consists of two months of data from an anonymous individual registered during the months of Oct.-Nov., 2012. Additionally, data includes number of steps taken in 5 minute intervals per day.  
+
+Assignment's instructions request to show any code that is needed to loading and preprocessing the data, so the whole process was:
+
+### Load and unzip data
+
+Check if "data" directory (data_dir) exists in working directory (WD). If not the case, create it and download and unzip data info.
+
+```{r file_check}
+check_file_exist <- function(file_path) 
+{
+        if (!file.exists(file_path))
+                stop("The ", file_path, " not found!") else TRUE 
+}
+```
+
+```{r load_data}
+load_data <- function(data_dir , fileURL, fileSource) 
+{
+        # Dataset check and load 
+        
+        source_path <- paste(data_dir, "/", fileSource , sep="")
+        txt_file <- paste(data_dir, "/","activity.csv", sep="")
+
+        if (!file.exists(txt_file)) {
+                if (!file.exists(source_path)) {
+                        message(paste("Please Wait! Load", fileURL, "..."));
+                        download.file(fileURL, destfile=source_path);
+                } 
+                else {
+                    message(paste("Please Wait! Unzip", source_path, " file..."));
+                    unzip(source_path, exdir = data_dir);
+                }
+        }
+        message(paste("Please Wait! Load", txt_file, " to dataset..."));
+        data <- read.csv(txt_file,
+                         header=TRUE,  na.strings="NA",
+                         colClasses=c("numeric", "character", "numeric"))
+        data$interval <- factor(data$interval)
+        data$date <- as.Date(data$date, format="%Y-%m-%d")
+        data        
+        
+}
+```
+
+***
+
+### Assign your WD to data_dir variable. Please change it to your own configuration.
+
+```{r Ass_Dir}
+data_dir <- "C:/Users/Larry/DataScience-Coursera/ReproducibleResearch/PeerAssessment1";
+
+```
+
+### Load and preparation of *tidy* data
+
+```{r load_prep_call}
+fileURL <- "https://d396qusza40orc.cloudfront.net/repdata%2Fdata%2Factivity.zip" 
+fileSource <-"activity.zip"
+source_path <- paste(data_dir, "/", fileSource , sep="")
+txt_file <- paste(data_dir, "/","activity.csv", sep="")
+
+        if (!file.exists(txt_file)) {
+                if (!file.exists(source_path)) {
+                        message(paste("Please Wait! Load", fileURL, "..."));
+                        download.file(fileURL, destfile=source_path);
+                } 
+                else {
+                    message(paste("Please Wait! Unzip", source_path, " file..."));
+                    unzip(source_path, exdir = data_dir);
+                }
+        }
+        message(paste("Please Wait! Load", txt_file, " to dataset..."));
+        tidy <- read.csv(txt_file,
+                         header=TRUE,   sep=",",
+                         colClasses=c("numeric", "character", "numeric"))
+        tidy$interval <- factor(tidy$interval)
+        tidy$date <- as.Date(tidy$date, format="%Y-%m-%d")
+                
+```
+
+As a very first and necessary step, see data structure. A preliminary view:  
+```{r str_data,}
+str(tidy)
 
 
-## Loading and preprocessing the data
+## Peer Assessment 1: Questions to be answered
+
+### What is mean total number of steps taken per day?
+
+As instructed by course team, missing values in the data set must be managed to get a tidy data.  
+
+First, a pre-calculation of steps aggregation by day is made:  
+```{r pre_calc}
+steps_taken_per_day <- aggregate(steps ~ date, tidy, sum)
+colnames(steps_taken_per_day) <- c("date", "steps")
+```
+Then, a histogram of the total number of steps taken each day is plotted with a bin interval of 1000 steps per Day.  
+```{r histogram, }
+ggplot(steps_taken_per_day, aes(x = steps)) + 
+       geom_histogram(fill = "darkblue", binwidth = 1000) + 
+        labs(title="Histogram of Steps Taken per Day", 
+             x = "Number of Steps per Day", y = "Number of times (Count)") + 
+        theme_bw()    
+```
+  
+Finally, mean and median of total number of steps taken per day is showed, removing NA (or missing) values:  
+
+```{r mean_median}
+mean_steps = round(mean(steps_taken_per_day$steps, na.rm=TRUE), 2)
+median_steps = round(median(steps_taken_per_day$steps, na.rm=TRUE), 2)
+```
+The Mean is **`r format(mean_steps, digits = 7)`** and 
+the Median is **`r format(median_steps,  digits = 7)`**  
+
+Now, next quetion is adressed.
+
+### What is the average daily activity pattern?
+
+Aggregation of steps by intervals of 5-minutes is made, interval to integer is coerced and names are given for colons of the result of this aggregation.  
+```{r steps_per_interval}
+steps_per_interval <- aggregate(tidy$steps, 
+                                by = list(interval = tidy$interval),
+                                FUN=mean, na.rm=TRUE)
+    # convert to integers for plotting
+steps_per_interval$interval <- 
+        as.integer(levels(steps_per_interval$interval)[steps_per_interval$interval])
+colnames(steps_per_interval) <- c("interval", "steps")
+```
+Now, a time series of the average number of steps (averaged across all days) versus the 5-minute intervals is plotted:  
+```{r plot_steps_per_interval}
+ggplot(steps_per_interval, aes(x=interval, y=steps)) +   
+        geom_line(color="darkblue", size=1) +  
+        labs(title="Average Daily Activity Pattern", x="Interval", y="Number of steps") +  
+        theme_bw() + theme(legend.position = "bottom")
+```
+  
+Next step is find the 5-minute interval containing maximum number of steps:  
+```{r max_step_interval}
+max_step_interval <- steps_per_interval[which.max(  
+        steps_per_interval$steps),]$interval
+```
+The variable **`r max_step_interval`<sup>th</sup> 5-minute interval** shows maximum number of steps.  
+
+### Imputing missing values:
+
+#### Total number of missing values in the dataset:
+To get this value, proceed as follows: 
+
+```{r TotalNA}
+sum(is.na(tidy$steps))
+```
+
+#### To get a a new tidy dataset, NA or missing values are replaced by mean values:
+
+```{r fill_data, echo=TRUE}
+fill_na <- function(data, defaults) {
+        na_indices <- which(is.na(data$steps))
+        na_replacements <- unlist(lapply(na_indices, FUN=function(idx){
+                interval = data[idx,]$interval
+                defaults[defaults$interval == interval,]$steps
+        }))
+        fill_steps <- data$steps
+        fill_steps[na_indices] <- na_replacements
+        fill_steps
+}
+
+data_fill <- data.frame(  
+        steps = fill_na(tidy, steps_per_interval),  
+        date = tidy$date,  
+        interval = tidy$interval)
+```
+
+#### Plotting a Histogram of number of steps/day  
+
+A bin interval of 1000 steps was chosen:   
+
+```{r complete_steps_per_day, echo=TRUE}
+
+full_steps_per_day <- aggregate(steps ~ date, data_fill, sum)
+colnames(full_steps_per_day) <- c("date", "steps")
+    
+ggplot(full_steps_per_day, aes(x=steps)) + 
+        geom_histogram(fill="darkblue", binwidth=1000) + 
+        labs(title="Histogram of Full Steps Taken per Day", 
+             x="Number of Steps after populate missing values", 
+             y="Count") + 
+        theme_bw()     
+
+```
+  
+#### Calculate and report the mean and median total number of steps taken per day  
+  
+```{r fill_median_mean}
+full_mean_steps = round(mean(full_steps_per_day$steps), 2)
+full_median_steps = round(median(full_steps_per_day$steps), 2)
+```
+* Mean after populate missing values is **`r format(full_mean_steps, digits = 7)`**  
+* Median populate missing values is **`r format(full_median_steps,  digits = 7)`**
+
+* Mean before populate missing values is **`r format(mean_steps, digits = 7)`**  
+* Median before missing values is **`r format(median_steps,  digits = 7)`**
+
+####  What is the impact of imputing missing data on the estimates of the total daily number of steps?
+
+Virtually, median matches the mean.
 
 
+### Are there differences in activity patterns between weekdays and weekends?
 
-## What is mean total number of steps taken per day?
+Follow this steps: 
 
+- Add a "day of the week" extra column to the data table.  
+- Divide table into two parts: weekends (Saturday and Sunday), and, on the other hand, weekdays (Monday through Friday).  
+- Tabulate the average steps per interval for each data set.  
+- Plot the two data sets side by side for comparison.  
 
+```{r weekdays}
+weekdays_steps <- function(data) {
+    weekdays_steps <- aggregate(data$steps, by=list(interval = data$interval),
+                          FUN=mean, na.rm=T)
+    # convert to integers for plotting
+    weekdays_steps$interval <- 
+            as.integer(levels(weekdays_steps$interval)[weekdays_steps$interval])
+    colnames(weekdays_steps) <- c("interval", "steps")
+    weekdays_steps
+}
 
-## What is the average daily activity pattern?
+data_by_weekdays <- function(data) {
+    data$weekday <- 
+            as.factor(weekdays(data$date)) # weekdays in portuguese
+    weekend_data <- subset(data, weekday %in% c("sábado","domingo"))
+    weekday_data <- subset(data, !weekday %in% c("sábado","domingo"))
+    
+    weekend_steps <- weekdays_steps(weekend_data)
+    weekday_steps <- weekdays_steps(weekday_data)
+    
+    weekend_steps$dayofweek <- rep("weekend", nrow(weekend_steps))
+    weekday_steps$dayofweek <- rep("weekday", nrow(weekday_steps))
+    
+    data_by_weekdays <- rbind(weekend_steps, weekday_steps)
+    data_by_weekdays$dayofweek <- as.factor(data_by_weekdays$dayofweek)
+    data_by_weekdays
+}
 
+data_weekdays <- data_by_weekdays(data_fill)
+```
 
+In the next plot, weekdays and weekends steps made by per 5-minute interval are compared: 
 
-## Imputing missing values
+```{r plot_weekdays}
+ggplot(data_weekdays, aes(x=interval, y=steps)) + 
+        geom_line(color="steelblue", size=1) + 
+        facet_wrap(~ dayofweek, nrow=2, ncol=1) +
+        labs(x="Interval", y="Number of steps") +
+        theme_bw()
 
+```
+  
+## Conclusion:
 
+- A tidy dataset is the first step to get confident and significant results.
 
-## Are there differences in activity patterns between weekdays and weekends?
+- As expected, during weekdays steps are greater than on weekends because of people is moving to their jobs, etc.
+
+- Activity is time-focused on weekends possibly due to free time from jobs.
